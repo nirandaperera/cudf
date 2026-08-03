@@ -217,7 +217,7 @@ async def default_node_multi(
                 )
                 for chunk, child in zip(ready_chunks, ir.children, strict=True)
             ]
-            with opaque_memory_usage(extra):
+            with opaque_memory_usage(extra, label=f"ir.{type(ir).__name__}"):
                 df = await ir_context.to_thread(
                     ir.do_evaluate,
                     *ir._non_child_args,

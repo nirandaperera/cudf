@@ -207,7 +207,7 @@ async def _evaluate_broadcast_chunk(
         reserve_extra=global_agg_per_row_size * chunk.shape[0],
         net_memory_delta=0,
     )
-    with opaque_memory_usage(extra):
+    with opaque_memory_usage(extra, label="over.broadcast"):
         return await ir_context.to_thread(
             _evaluate_ir_broadcast_sync,
             chunk,
@@ -378,7 +378,7 @@ async def _allgather_and_broadcast(
             reserve_extra=chunk.data_alloc_size(),
             net_memory_delta=0,
         )
-        with opaque_memory_usage(extra):
+        with opaque_memory_usage(extra, label="over.partial_agg"):
             partial = await ir_context.to_thread(
                 _evaluate_chunk_sync,
                 chunk,

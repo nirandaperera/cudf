@@ -173,7 +173,19 @@ class IRExecutionContext:
         )
         loop = asyncio.get_running_loop()
         ctx = contextvars.copy_context()
-        func_call = functools.partial(ctx.run, func, *args, **kwargs)
+
+        def _run() -> T:
+            from rapidsmpf.memory.reservation_accuracy import (
+                active_tracking,
+                allocation_scope,
+            )
+
+            if active_tracking() is None:
+                return func(*args, **kwargs)
+            with allocation_scope():
+                return func(*args, **kwargs)
+
+        func_call = functools.partial(ctx.run, _run)
         return await loop.run_in_executor(self.py_executor, func_call)
 
     @contextlib.contextmanager

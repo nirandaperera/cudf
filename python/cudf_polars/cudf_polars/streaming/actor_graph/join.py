@@ -248,7 +248,7 @@ async def _collect_small_side_for_broadcast(
                 reserve_extra=size,
                 net_memory_delta=0,
             )
-            with opaque_memory_usage(extra):
+            with opaque_memory_usage(extra, label="join.concat_inputs"):
                 dfs = [
                     _concat(
                         *[chunk_to_frame(chunk, ir) for chunk in chunks],
@@ -292,7 +292,8 @@ async def _broadcast_join_large_chunk(
     join_results: list[DataFrame] = []
     input_bytes = large_chunk_size + small_size
     with opaque_memory_usage(
-        await reserve_memory(context, size=input_bytes, net_memory_delta=0)
+        await reserve_memory(context, size=input_bytes, net_memory_delta=0),
+        label="join.broadcast",
     ):
         for sdf in dfs_to_join:
             result = await ir_context.to_thread(
@@ -502,7 +503,8 @@ async def _join_chunks(
             )
         )
         with opaque_memory_usage(
-            await reserve_memory(context, size=input_bytes, net_memory_delta=0)
+            await reserve_memory(context, size=input_bytes, net_memory_delta=0),
+            label="join.probe",
         ):
             df = await ir_context.to_thread(
                 ir.do_evaluate,

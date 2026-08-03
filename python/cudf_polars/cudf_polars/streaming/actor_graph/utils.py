@@ -787,7 +787,7 @@ async def evaluate_chunk(
         reserve_extra=chunk.data_alloc_size(),
         net_memory_delta=0,
     )
-    with opaque_memory_usage(extra):
+    with opaque_memory_usage(extra, label="evaluate_chunk"):
         for single_ir in irs:
             chunk = await ir_context.to_thread(
                 _evaluate_chunk_sync, chunk, single_ir, ir_context, context.br()
@@ -868,7 +868,7 @@ async def concat_batch(
         reserve_extra=sum(c.data_alloc_size() for c in batch),
         net_memory_delta=0,
     )
-    with opaque_memory_usage(extra):
+    with opaque_memory_usage(extra, label="concat_chunks"):
         df = await ir_context.to_thread(
             _concat,
             *[

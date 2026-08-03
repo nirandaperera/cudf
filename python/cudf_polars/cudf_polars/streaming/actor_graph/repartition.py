@@ -202,7 +202,7 @@ async def concatenate_node(
                         reserve_extra=sum(chunk.data_alloc_size() for chunk in chunks),
                         net_memory_delta=0,
                     )
-                    with opaque_memory_usage(extra):
+                    with opaque_memory_usage(extra, label="repartition.concat"):
                         df = _concat(
                             *(
                                 DataFrame.from_table(

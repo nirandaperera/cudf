@@ -386,7 +386,8 @@ async def _process_and_send_chunk(
     with opaque_memory_usage(
         await reserve_memory(
             context, size=reservation, net_memory_delta=net_memory_delta
-        )
+        ),
+        label="scan.process_chunk",
     ):
         df = await ir_context.to_thread(process)
     chunk_out = TableChunk.from_pylibcudf_table(
@@ -547,7 +548,8 @@ async def read_chunk(
     with opaque_memory_usage(
         await reserve_memory(
             context, size=estimated_chunk_bytes, net_memory_delta=estimated_chunk_bytes
-        )
+        ),
+        label="scan.do_evaluate",
     ):
         df = await ir_context.to_thread(
             scan.do_evaluate,
