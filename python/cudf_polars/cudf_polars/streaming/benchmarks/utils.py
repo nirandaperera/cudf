@@ -936,6 +936,28 @@ def _collect_statistics(engine: pl.GPUEngine | None) -> dict[str, Any] | None:
     return engine.global_statistics(clear=True).to_dict()
 
 
+def _print_reservation_accuracy(q_id: int, iteration: int) -> None:
+    """Print and clear per-query reservation-accuracy samples when enabled."""
+    try:
+        from rapidsmpf.memory.reservation_accuracy import (
+            clear,
+            is_enabled,
+            report,
+        )
+    except ImportError:
+        return
+    if not is_enabled():
+        return
+    text = report()
+    clear()
+    if "no samples" in text:
+        return
+    print(
+        f"\nReservation accuracy — query {q_id} iteration {iteration}\n{text}\n",
+        flush=True,
+    )
+
+
 def run_polars_query_iteration(
     q_id: int,
     iteration: int,
@@ -949,49 +971,52 @@ def run_polars_query_iteration(
     result_casts: list[pl.Expr] | None = None,
 ) -> SuccessRecord:
     """Run a single query iteration. Caller must wrap in try/except."""
-    result, duration = execute_query(q_id, iteration, q, run_config, args, engine)
+    try:
+        result, duration = execute_query(q_id, iteration, q, run_config, args, engine)
 
-    if expected is not None and prepare_validation_result is not None:
-        result = prepare_validation_result(result)
+        if expected is not None and prepare_validation_result is not None:
+            result = prepare_validation_result(result)
 
-    if expected is not None and result_casts:
-        # Applying the casts to the polars result is
-        # a workaround we need because of a polars bug
-        # See https://github.com/pola-rs/polars/issues/27269
-        # Once we support polars 1.40, we should remove this
-        result = result.with_columns(*result_casts)
+        if expected is not None and result_casts:
+            # Applying the casts to the polars result is
+            # a workaround we need because of a polars bug
+            # See https://github.com/pola-rs/polars/issues/27269
+            # Once we support polars 1.40, we should remove this
+            result = result.with_columns(*result_casts)
 
-    statistics = _collect_statistics(engine)
+        statistics = _collect_statistics(engine)
 
-    if expected is not None:
-        validation_result = validate_result(
-            result,
-            expected,
-            query_result.sort_by,
-            limit=query_result.limit,
-            nulls_last=query_result.nulls_last,
-            sort_keys=query_result.sort_keys,
-            **get_validation_options(args),
+        if expected is not None:
+            validation_result = validate_result(
+                result,
+                expected,
+                query_result.sort_by,
+                limit=query_result.limit,
+                nulls_last=query_result.nulls_last,
+                sort_keys=query_result.sort_keys,
+                **get_validation_options(args),
+            )
+        else:
+            validation_result = None
+
+        if args.print_results:
+            print(result)
+
+        if args.results_directory is not None and iteration == 0:
+            results_dir = Path(args.results_directory)
+            results_dir.mkdir(parents=True, exist_ok=True)
+            output_path = results_dir / f"q_{q_id:02d}.parquet"
+            result.write_parquet(output_path)
+
+        return SuccessRecord(
+            query=q_id,
+            iteration=iteration,
+            duration=duration,
+            statistics=statistics,
+            validation_result=validation_result,
         )
-    else:
-        validation_result = None
-
-    if args.print_results:
-        print(result)
-
-    if args.results_directory is not None and iteration == 0:
-        results_dir = Path(args.results_directory)
-        results_dir.mkdir(parents=True, exist_ok=True)
-        output_path = results_dir / f"q_{q_id:02d}.parquet"
-        result.write_parquet(output_path)
-
-    return SuccessRecord(
-        query=q_id,
-        iteration=iteration,
-        duration=duration,
-        statistics=statistics,
-        validation_result=validation_result,
-    )
+    finally:
+        _print_reservation_accuracy(q_id, iteration)
 
 
 def run_polars_query(
